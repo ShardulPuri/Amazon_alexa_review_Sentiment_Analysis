@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Text Sentiment Predictor - Dark Mode</title>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" />
+</head>
+
+<body class="bg-gray-900 text-gray-100 min-h-screen flex flex-col items-center justify-center p-6">
+
+  <h1 class="text-4xl font-bold mb-8 text-teal-400">
+    Text Sentiment Prediction
+  </h1>
+
+  <form id="predictionForm" class="w-full max-w-xl bg-gray-800 rounded-lg shadow-lg p-8 space-y-6" onsubmit="return false;">
+    <div>
+      <label for="csvFileInput" class="block mb-2 font-semibold text-gray-300">Upload CSV File</label>
+      <input type="file" id="csvFileInput" accept=".csv"
+        class="block w-full p-3 rounded border border-gray-600 bg-gray-900 text-gray-100 focus:ring-2 focus:ring-teal-400" />
+    </div>
+
+    <div>
+      <label for="textInput" class="block mb-2 font-semibold text-gray-300">Or Enter Text for Prediction</label>
+      <textarea id="textInput" placeholder="Enter text..."
+        class="block w-full p-3 rounded border border-gray-600 resize-none bg-gray-900 text-gray-100 focus:ring-2 focus:ring-teal-400 h-28"></textarea>
+    </div>
+
+    <div class="flex space-x-4">
+      <button type="button" onclick="predict()"
+        class="flex-grow bg-teal-600 text-white font-semibold py-3 rounded-lg hover:bg-teal-700 transition">
+        Predict
+      </button>
+
+      <button id="downloadBtn" style="display:none" onclick="downloadPredictions()" type="button"
+        class="flex-grow bg-green-600 text-white font-semibold py-3 rounded-lg hover:bg-green-700 transition">
+        Download
+      </button>
+    </div>
+  </form>
+
+  <div id="predictionResult"
+    class="mt-8 p-6 bg-gray-800 rounded-lg shadow-md max-w-xl w-full text-center text-lg font-medium text-gray-100">
+  </div>
+  <div id="graphContainer" class="mt-6 max-w-xl w-full flex justify-center"></div>
+
+  <script>
+    function predict() {
+      var csvFileInput = document.getElementById("csvFileInput");
+      var textInput = document.getElementById("textInput");
+      var predictionResult = document.getElementById("predictionResult");
+      var graphContainer = document.getElementById("graphContainer");
+      graphContainer.innerHTML = "";
+      predictionResult.innerHTML = "";
+
+      if (csvFileInput.files.length > 0) {
+        var formData = new FormData();
+        formData.append("file", csvFileInput.files[0]);
+
+        fetch("http://localhost:5000/predict", {
+          method: "POST",
+          body: formData
+        })
+          .then(response => {
+            if (response.headers.get('X-Graph-Exists') === 'true') {
+              var graphData = response.headers.get('X-Graph-Data');
+              displayGraph(graphData);
+            }
+            return response.blob();
+          })
+          .then(blob => {
+            document.getElementById("downloadBtn").style.display = "block";
+            document.getElementById("downloadBtn").onclick = function () {
+              var url = URL.createObjectURL(blob);
+              var a = document.createElement("a");
+              a.href = url;
+              a.download = "Predictions.csv";
+              document.body.appendChild(a);
+              a.click();
+              document.body.removeChild(a);
+            };
+          })
+          .catch(error => {
+            console.error("Error:", error);
+            predictionResult.innerHTML = "Error occurred: " + error;
+          });
+
+      } else if (textInput.value.trim() !== "") {
+        fetch("http://localhost:5000/predict", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({ "text": textInput.value.trim() })
+        })
+          .then(response => response.json())
+          .then(data => {
+            if (data.error) {
+              predictionResult.innerHTML = "Error: " + data.error;
+            } else {
+              predictionResult.innerHTML = "Predicted sentiment: " + data.prediction;
+            }
+          })
+          .catch(error => {
+            console.error("Error:", error);
+            predictionResult.innerHTML = "Error occurred: " + error;
+          });
+      }
+    }
+
+    function downloadPredictions() {
+      console.log("Download prediction");
+    }
+
+    function displayGraph(graphData) {
+      predictionResult.innerHTML = "";
+      var graphUrl = "data:image/png;base64," + graphData;
+      var img = document.createElement('img');
+      img.src = graphUrl;
+      graphContainer.appendChild(img);
+    }
+  </script>
+
+</body>
+
+</html>

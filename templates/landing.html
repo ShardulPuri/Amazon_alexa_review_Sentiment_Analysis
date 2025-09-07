@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Amazon Alexa Reviews Analysis - Dark Mode</title>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" />
+  <link rel="shortcut icon" href="./assets/img/favicon.ico" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css" />
+</head>
+
+<body class="bg-gray-900 text-gray-100 min-h-screen flex flex-col">
+
+  <header class="py-12 text-center">
+    <h1 class="text-5xl font-extrabold mb-4 text-teal-400">Understand the Emotions Behind the Words 😊</h1>
+    <p class="max-w-3xl mx-auto text-lg font-light opacity-90 text-gray-300">
+      Text sentiment prediction is a powerful tool that helps you understand emotions and opinions expressed in text data,
+      enabling improvements in your business and user engagement.
+    </p>
+  </header>
+
+  <main class="flex-grow container mx-auto px-5 sm:px-10 md:px-20">
+    <section class="bg-gray-800 rounded-lg shadow-lg p-10 max-w-5xl mx-auto">
+      <h2 class="text-4xl font-bold mb-8 text-center text-teal-400 underline underline-offset-8">
+        Text Sentiment Prediction
+      </h2>
+
+      <div class="flex flex-col md:flex-row gap-10">
+        <!-- Form Container -->
+        <div class="md:w-1/2">
+          <form id="predictionForm" class="space-y-6" onsubmit="return false;">
+            <div>
+              <label class="block text-gray-300 mb-2 font-semibold" for="csvFileInput">
+                Upload CSV File
+              </label>
+              <input type="file" id="csvFileInput" accept=".csv"
+                class="w-full rounded-lg border border-gray-600 bg-gray-900 p-3 text-gray-100 focus:ring-2 focus:ring-teal-400" />
+            </div>
+
+            <div>
+              <label class="block text-gray-300 mb-2 font-semibold" for="textInput">
+                Or Enter Text for Prediction
+              </label>
+              <textarea id="textInput" placeholder="Enter text..."
+                class="w-full h-32 p-3 rounded-lg border border-gray-600 bg-gray-900 resize-none text-gray-100 focus:ring-2 focus:ring-teal-400"></textarea>
+            </div>
+
+            <button type="button" onclick="predict()"
+              class="w-full bg-teal-600 hover:bg-teal-700 transition-colors text-white font-semibold py-3 rounded-lg shadow-lg">
+              Predict
+            </button>
+
+            <button id="downloadBtn" style="display:none" onclick="downloadPredictions()" type="button"
+              class="w-full bg-green-600 hover:bg-green-700 transition-colors text-white font-semibold py-3 rounded-lg shadow-lg">
+              Download Predictions
+            </button>
+          </form>
+        </div>
+
+        <!-- Results Container -->
+        <div class="md:w-1/2 space-y-10">
+          <div>
+            <h3 class="text-3xl font-semibold text-teal-400 mb-4 border-b-2 border-teal-400 pb-2">
+              Prediction Result
+            </h3>
+            <div id="predictionResult"
+              class="p-5 border border-gray-700 rounded-lg min-h-[70px] bg-gray-900 text-gray-100 font-medium"></div>
+          </div>
+
+          <div>
+            <h3 class="text-3xl font-semibold text-teal-400 mb-4 border-b-2 border-teal-400 pb-2">
+              Sentiment Distribution
+            </h3>
+            <div id="graphContainer" class="flex justify-center"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="bg-gray-800 text-gray-400 text-center py-6 mt-12">
+    <p>© 2025 Text Sentiment Prediction</p>
+  </footer>
+
+  <script>
+    function predict() {
+      var csvFileInput = document.getElementById("csvFileInput");
+      var textInput = document.getElementById("textInput");
+      var predictionResult = document.getElementById("predictionResult");
+      var graphContainer = document.getElementById("graphContainer");
+      graphContainer.innerHTML = "";
+      predictionResult.innerHTML = "";
+
+      if (csvFileInput.files.length > 0) {
+        var formData = new FormData();
+        formData.append("file", csvFileInput.files[0]);
+
+        fetch("http://localhost:5000/predict", {
+          method: "POST",
+          body: formData
+        })
+          .then(response => {
+            if (response.headers.get('X-Graph-Exists') === 'true') {
+              var graphData = response.headers.get('X-Graph-Data');
+              displayGraph(graphData);
+            }
+            return response.blob();
+          })
+          .then(blob => {
+            document.getElementById("downloadBtn").style.display = "block";
+            document.getElementById("downloadBtn").onclick = function () {
+              var url = URL.createObjectURL(blob);
+              var a = document.createElement("a");
+              a.href = url;
+              a.download = "Predictions.csv";
+              document.body.appendChild(a);
+              a.click();
+              document.body.removeChild(a);
+            };
+          })
+          .catch(error => {
+            console.error("Error:", error);
+            predictionResult.innerHTML = "Error occurred: " + error;
+          });
+
+      } else if (textInput.value.trim() !== "") {
+        fetch("http://localhost:5000/predict", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({ "text": textInput.value.trim() })
+        })
+          .then(response => response.json())
+          .then(data => {
+            if (data.error) {
+              predictionResult.innerHTML = "Error: " + data.error;
+            } else {
+              predictionResult.innerHTML = "Predicted sentiment: " + data.prediction;
+            }
+          })
+          .catch(error => {
+            console.error("Error:", error);
+            predictionResult.innerHTML = "Error occurred: " + error;
+          });
+      }
+    }
+
+    function downloadPredictions() {
+      console.log("Download prediction");
+    }
+
+    function displayGraph(graphData) {
+      predictionResult.innerHTML = "";
+      var graphUrl = "data:image/png;base64," + graphData;
+      var img = document.createElement('img');
+      img.src = graphUrl;
+      graphContainer.appendChild(img);
+    }
+  </script>
+
+</body>
+
+</html>
