@@ -8,3 +8,4 @@ xgboost
 streamlit
 flask
 gunicorn
+flask-cors
